@@ -51,6 +51,7 @@ namespace UartWinFormsExample
             this.radioTextDisplay = new System.Windows.Forms.RadioButton();
             this.chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
+            this.btnMode = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart2)).BeginInit();
             this.SuspendLayout();
@@ -185,9 +186,20 @@ namespace UartWinFormsExample
             this.chart2.TabIndex = 12;
             this.chart2.Text = "chart2";
             // 
+            // btnMode
+            // 
+            this.btnMode.Location = new System.Drawing.Point(365, 10);
+            this.btnMode.Name = "btnMode";
+            this.btnMode.Size = new System.Drawing.Size(75, 23);
+            this.btnMode.TabIndex = 13;
+            this.btnMode.Text = "Tự động";
+            this.btnMode.UseVisualStyleBackColor = true;
+            this.btnMode.Click += new System.EventHandler(this.btnMode_Click);
+            // 
             // Form1
             // 
             this.ClientSize = new System.Drawing.Size(808, 529);
+            this.Controls.Add(this.btnMode);
             this.Controls.Add(this.chart2);
             this.Controls.Add(this.chart1);
             this.Controls.Add(this.comboBoxPorts);
@@ -243,6 +255,7 @@ namespace UartWinFormsExample
         private System.Windows.Forms.RadioButton radioTextDisplay;
         private System.Windows.Forms.DataVisualization.Charting.Chart chart1;
         private System.Windows.Forms.DataVisualization.Charting.Chart chart2;
+        private Button btnMode;
     }
 }
 

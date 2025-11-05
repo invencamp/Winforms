@@ -1,0 +1,87 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\admin\\source\\repos\\App1\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{536DD370-1491-4AB1-9D69-D8A0F928151C}|App1\\App1.csproj|c:\\users\\admin\\source\\repos\\app1\\app1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{536DD370-1491-4AB1-9D69-D8A0F928151C}|App1\\App1.csproj|solutionrelative:app1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{536DD370-1491-4AB1-9D69-D8A0F928151C}|App1\\App1.csproj|C:\\Users\\admin\\source\\repos\\App1\\app1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
+      "RelativeMoniker": "D:0:0:{536DD370-1491-4AB1-9D69-D8A0F928151C}|App1\\App1.csproj|solutionrelative:app1\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{536DD370-1491-4AB1-9D69-D8A0F928151C}|App1\\App1.csproj|C:\\Users\\admin\\source\\repos\\App1\\app1\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{536DD370-1491-4AB1-9D69-D8A0F928151C}|App1\\App1.csproj|solutionrelative:app1\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{536DD370-1491-4AB1-9D69-D8A0F928151C}|App1\\App1.csproj|C:\\Users\\admin\\source\\repos\\App1\\app1\\form1.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{536DD370-1491-4AB1-9D69-D8A0F928151C}|App1\\App1.csproj|solutionrelative:app1\\form1.designer.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Form1.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\source\\repos\\App1\\App1\\Form1.cs",
+              "RelativeDocumentMoniker": "App1\\Form1.cs",
+              "ToolTip": "C:\\Users\\admin\\source\\repos\\App1\\App1\\Form1.cs",
+              "RelativeToolTip": "App1\\Form1.cs",
+              "ViewState": "AgIAAEcAAAAAMzMzMzMiwF4AAAAZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-30T08:38:22.062Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\source\\repos\\App1\\App1\\Program.cs",
+              "RelativeDocumentMoniker": "App1\\Program.cs",
+              "ToolTip": "C:\\Users\\admin\\source\\repos\\App1\\App1\\Program.cs",
+              "RelativeToolTip": "App1\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-31T08:33:09.504Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Form1.Designer.cs",
+              "DocumentMoniker": "C:\\Users\\admin\\source\\repos\\App1\\App1\\Form1.Designer.cs",
+              "RelativeDocumentMoniker": "App1\\Form1.Designer.cs",
+              "ToolTip": "C:\\Users\\admin\\source\\repos\\App1\\App1\\Form1.Designer.cs",
+              "RelativeToolTip": "App1\\Form1.Designer.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAIAAAAZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-31T08:26:58.838Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Form1.cs [Design]",
+              "DocumentMoniker": "C:\\Users\\admin\\source\\repos\\App1\\App1\\Form1.cs",
+              "RelativeDocumentMoniker": "App1\\Form1.cs",
+              "ToolTip": "C:\\Users\\admin\\source\\repos\\App1\\App1\\Form1.cs [Design]",
+              "RelativeToolTip": "App1\\Form1.cs [Design]",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-10-30T08:38:05.275Z",
+              "EditorCaption": " [Design]"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

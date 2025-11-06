@@ -1,8 +1,12 @@
-﻿using System;
+﻿using Firebase.Database;
+using Firebase.Database.Query;
+using System;
 using System.Drawing;
 using System.IO.Ports;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.DataVisualization.Charting;
 
@@ -11,13 +15,79 @@ namespace UartWinFormsExample
     public partial class Form1 : Form
     {
         private SerialPort _serial;
+        private FirebaseClient firebase;
+        private CancellationTokenSource pushFirebaseCts;
 
+        // Biến lưu giá trị hiện tại để push lên Firebase
+        private double temp = 0;
+        private double humi = 0;
+        private int adc = 0;
         public Form1()
         {
             InitializeComponent();
             InitSerial();
             LoadComPorts();
             InitCharts(); // Thêm dòng này
+            try // connect to the firebase
+            {
+                firebase = new FirebaseClient("https://dht22-fed51-default-rtdb.firebaseio.com/");
+            }
+            catch (Exception ex) // connect failed
+            {
+                MessageBox.Show("Không thể khởi tạo Firebase client: " + ex.Message,
+                                "Lỗi kết nối", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+           
+        }
+        // Hàm push dữ liệu lên Firebase
+        private async void PushDataToFirebase()
+        {
+            pushFirebaseCts = new CancellationTokenSource();
+
+            while (!pushFirebaseCts.Token.IsCancellationRequested)
+            {
+                try
+                {
+                    if (firebase != null)
+                    {
+                        // Lấy giá trị PWM từ txtSend
+                        string pwmValue = "";
+                        Invoke(new Action(() =>
+                        {
+                            pwmValue = txtSend.Text;
+                        }));
+
+                        // Push dữ liệu lên Firebase
+                        await firebase
+                            .Child("Data")
+                            .PutAsync(new
+                            {
+                                Temp = temp,
+                                Humi = humi,
+                                ADC = adc,
+                                PWM = pwmValue,
+                                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                            });
+
+                        // Cập nhật status (optional)
+                        BeginInvoke(new Action(() =>
+                        {
+                            // Có thể thêm label status nếu muốn
+                            // lblStatus.Text = $"✓ Đã push lên Firebase lúc {DateTime.Now:HH:mm:ss}";
+                        }));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        txtReceived.AppendText($"⚠️ Lỗi push Firebase: {ex.Message}\n");
+                    }));
+                }
+
+                // Chờ 3 giây trước khi push lần tiếp theo
+                await Task.Delay(3000);
+            }
         }
         private void InitCharts()
         {
@@ -67,13 +137,16 @@ namespace UartWinFormsExample
         {
             try
             {
-                if (_serial.IsOpen) { _serial.Close(); btnOpen.Text = "Open"; return; }
+                if (_serial.IsOpen) { _serial.Close(); btnOpen.Text = "Open";// Dừng push Firebase khi đóng COM
+                    pushFirebaseCts?.Cancel(); return; }
 
                 if (comboBoxPorts.SelectedItem == null) { MessageBox.Show("Chọn COM port"); return; }
                 _serial.PortName = comboBoxPorts.SelectedItem.ToString();
                 _serial.BaudRate = int.Parse(comboBoxBaud.SelectedItem.ToString());
                 _serial.Open();
                 btnOpen.Text = "Close";
+                // Bắt đầu push Firebase khi mở COM
+                Task.Run(() => PushDataToFirebase());
             }
             catch (Exception ex) { MessageBox.Show("Không mở được COM: " + ex.Message); }
         }
@@ -144,9 +217,9 @@ namespace UartWinFormsExample
 
                         if (match.Success)
                         {
-                            double temp = double.Parse(match.Groups[1].Value);
-                            double humi = double.Parse(match.Groups[2].Value);
-                            int adc = int.Parse(match.Groups[3].Value);
+                            temp = double.Parse(match.Groups[1].Value);
+                            humi = double.Parse(match.Groups[2].Value);
+                            adc = int.Parse(match.Groups[3].Value);
 
                             // Vẽ chart
                             chart1.Series[0].Points.AddY(temp);
@@ -216,7 +289,7 @@ namespace UartWinFormsExample
 
         private void Form1_Load(object sender, EventArgs e)
         {
-
+            lbl_DateAndTime.Text = "Date: " + DateTime.Now.ToString("yyyy-MM-dd");
         }
 
         private void btnMode_Click(object sender, EventArgs e)

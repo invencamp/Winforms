@@ -52,6 +52,7 @@ namespace UartWinFormsExample
             this.chart1 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.chart2 = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.btnMode = new System.Windows.Forms.Button();
+            this.lbl_DateAndTime = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.chart1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chart2)).BeginInit();
             this.SuspendLayout();
@@ -196,9 +197,19 @@ namespace UartWinFormsExample
             this.btnMode.UseVisualStyleBackColor = true;
             this.btnMode.Click += new System.EventHandler(this.btnMode_Click);
             // 
+            // lbl_DateAndTime
+            // 
+            this.lbl_DateAndTime.AutoSize = true;
+            this.lbl_DateAndTime.Location = new System.Drawing.Point(69, 334);
+            this.lbl_DateAndTime.Name = "lbl_DateAndTime";
+            this.lbl_DateAndTime.Size = new System.Drawing.Size(59, 13);
+            this.lbl_DateAndTime.TabIndex = 14;
+            this.lbl_DateAndTime.Text = "Date & Time";
+            // 
             // Form1
             // 
             this.ClientSize = new System.Drawing.Size(808, 529);
+            this.Controls.Add(this.lbl_DateAndTime);
             this.Controls.Add(this.btnMode);
             this.Controls.Add(this.chart2);
             this.Controls.Add(this.chart1);
@@ -256,6 +267,7 @@ namespace UartWinFormsExample
         private System.Windows.Forms.DataVisualization.Charting.Chart chart1;
         private System.Windows.Forms.DataVisualization.Charting.Chart chart2;
         private Button btnMode;
+        private Label lbl_DateAndTime;
     }
 }
 

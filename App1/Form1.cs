@@ -79,10 +79,7 @@ namespace UartWinFormsExample
                 }
                 catch (Exception ex)
                 {
-                    BeginInvoke(new Action(() =>
-                    {
-                        txtReceived.AppendText($"⚠️ Lỗi push Firebase: {ex.Message}\n");
-                    }));
+
                 }
 
                 // Chờ 3 giây trước khi push lần tiếp theo
@@ -239,8 +236,7 @@ namespace UartWinFormsExample
                         }
                         else
                         {
-                            // Debug: hiển thị dữ liệu không match
-                            txtReceived.AppendText($"[DEBUG] No match: {completeLine.Trim()}\r\n");
+                           
                         }
                     }
                 }));
@@ -296,15 +292,55 @@ namespace UartWinFormsExample
         {
             if (btnMode.Text == "Tự động")
             {
-                _serial.Write("m");
-                btnMode.Text = "Thủ công";
+                if (_serial.IsOpen)
+                {
+                    _serial.Write("m");
+                    btnMode.Text = "Thủ công";
+                }
+                else
+                {
+                    MessageBox.Show("Chưa kết nối cổng COM");
+                }
             }
             else
             {
-                _serial.Write("a");
-                btnMode.Text = "Tự động";
+                if (_serial.IsOpen)
+                {
+                    _serial.Write("a");
+                    btnMode.Text = "Tự động";
+                }
+                else
+                {
+                    MessageBox.Show("Chưa kết nối cổng COM");
+                }
             }
                
+        }
+
+        private void txtSend_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void btnSet_Click(object sender, EventArgs e)
+        {
+            if (!_serial.IsOpen) { MessageBox.Show("COM chưa mở"); return; }
+            try
+            {
+                string s = txtSet.Text;
+                if (checkBoxAppendNewline.Checked) s += "\r\n";
+                if (radioHex.Checked)
+                {
+                    // gửi hex (ví dụ: "0A 01 FF")
+                    byte[] data = HexStringToBytes(s);
+                    _serial.Write(data, 0, data.Length);
+                }
+                else
+                {
+                    _serial.Write(s);
+                }
+            }
+            catch (Exception ex) { MessageBox.Show("Gửi lỗi: " + ex.Message); }
         }
     }
 }

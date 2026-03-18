@@ -1,6 +1,5 @@
-﻿using Firebase.Database;
-using Firebase.Database.Query;
-using System;
+﻿using System;
+using System.Data.SqlClient;
 using System.Drawing;
 using System.IO.Ports;
 using System.Text;
@@ -15,96 +14,38 @@ namespace UartWinFormsExample
     public partial class Form1 : Form
     {
         private SerialPort _serial;
-        private FirebaseClient firebase;
-        private CancellationTokenSource pushFirebaseCts;
 
-        // Biến lưu giá trị hiện tại để push lên Firebase
-        private double temp = 0;
-        private double humi = 0;
-        private int adc = 0;
+        private bool isTrackingStep = false;
+        private double maxVelocityReached = 0;
+        private int stepPointsCount = 0; // Đếm số điểm (mỗi điểm = 0.5s)
+        private double currentSetpoint = 0;
+        private bool wasTuning = false;
+        private double startVelocity = 0; // Lưu tốc độ lúc vừa ấn Set
+        private double minVelocityReached = 9999; // Dùng cho giảm tốc
+
+        private double velocity = 0;
+        private string setpoint = "80";
         public Form1()
         {
             InitializeComponent();
             InitSerial();
             LoadComPorts();
-            InitCharts(); // Thêm dòng này
-            try // connect to the firebase
-            {
-                firebase = new FirebaseClient("https://dht22-fed51-default-rtdb.firebaseio.com/");
-            }
-            catch (Exception ex) // connect failed
-            {
-                MessageBox.Show("Không thể khởi tạo Firebase client: " + ex.Message,
-                                "Lỗi kết nối", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-           
-        }
-        // Hàm push dữ liệu lên Firebase
-        private async void PushDataToFirebase()
-        {
-            pushFirebaseCts = new CancellationTokenSource();
-
-            while (!pushFirebaseCts.Token.IsCancellationRequested)
-            {
-                try
-                {
-                    if (firebase != null)
-                    {
-                        // Lấy giá trị PWM từ txtSend
-                        string pwmValue = "";
-                        Invoke(new Action(() =>
-                        {
-                            pwmValue = txtSend.Text;
-                        }));
-
-                        // Push dữ liệu lên Firebase
-                        await firebase
-                            .Child("Data")
-                            .PutAsync(new
-                            {
-                                Temp = temp,
-                                Humi = humi,
-                                ADC = adc,
-                                PWM = pwmValue,
-                                Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                            });
-
-                        // Cập nhật status (optional)
-                        BeginInvoke(new Action(() =>
-                        {
-                            // Có thể thêm label status nếu muốn
-                            // lblStatus.Text = $"✓ Đã push lên Firebase lúc {DateTime.Now:HH:mm:ss}";
-                        }));
-                    }
-                }
-                catch (Exception ex)
-                {
-
-                }
-
-                // Chờ 3 giây trước khi push lần tiếp theo
-                await Task.Delay(3000);
-            }
+            InitCharts(); // Thêm dòng này           
         }
         private void InitCharts()
         {
-            // Đảm bảo chart đã được khởi tạo đúng
-            if (chart1.Series.Count < 2)
-            {
-                chart1.Series.Clear();
-                chart1.Series.Add("Temperature");
-                chart1.Series.Add("Humidity");
-            }
-
-            if (chart2.Series.Count < 1)
+            if (chart2.Series.Count < 2)
             {
                 chart2.Series.Clear();
-                chart2.Series.Add("ADC");
+                chart2.Series.Add("Velocity");
+                chart2.Series.Add("Setpoint");
             }
-
-            chart1.Series[0].ChartType = SeriesChartType.Line;
-            chart1.Series[1].ChartType = SeriesChartType.Line;
             chart2.Series[0].ChartType = SeriesChartType.Line;
+            chart2.Series[1].ChartType = SeriesChartType.Line;
+
+            // Cố định trục Y cho chart2 (ADC)
+            chart2.ChartAreas[0].AxisY.Minimum = 0;
+            chart2.ChartAreas[0].AxisY.Maximum = 200;  // Với ADC 12-bit
         }
        
         private void InitSerial()
@@ -135,39 +76,19 @@ namespace UartWinFormsExample
             try
             {
                 if (_serial.IsOpen) { _serial.Close(); btnOpen.Text = "Open";// Dừng push Firebase khi đóng COM
-                    pushFirebaseCts?.Cancel(); return; }
+                     return; }
 
                 if (comboBoxPorts.SelectedItem == null) { MessageBox.Show("Chọn COM port"); return; }
                 _serial.PortName = comboBoxPorts.SelectedItem.ToString();
                 _serial.BaudRate = int.Parse(comboBoxBaud.SelectedItem.ToString());
                 _serial.Open();
                 btnOpen.Text = "Close";
-                // Bắt đầu push Firebase khi mở COM
-                Task.Run(() => PushDataToFirebase());
+
             }
             catch (Exception ex) { MessageBox.Show("Không mở được COM: " + ex.Message); }
         }
 
-        private void btnSend_Click(object sender, EventArgs e)
-        {
-            if (!_serial.IsOpen) { MessageBox.Show("COM chưa mở"); return; }
-            try
-            {
-                string s = txtSend.Text;
-                if (checkBoxAppendNewline.Checked) s += "\r\n";
-                if (radioHex.Checked)
-                {
-                    // gửi hex (ví dụ: "0A 01 FF")
-                    byte[] data = HexStringToBytes(s);
-                    _serial.Write(data, 0, data.Length);
-                }
-                else
-                {
-                    _serial.Write(s);
-                }
-            }
-            catch (Exception ex) { MessageBox.Show("Gửi lỗi: " + ex.Message); }
-        }
+        
 
         // Thêm biến để lưu buffer tích lũy
         private StringBuilder _receiveBuffer = new StringBuilder();
@@ -208,35 +129,98 @@ namespace UartWinFormsExample
                         // Parse dữ liệu
                         var match = Regex.Match(
                             completeLine,
-                            @"TEMP\s*=\s*([\d\.]+)\s*;\s*HUMI\s*=\s*([\d\.]+)\s*;\s*ADC\s*=\s*(\d+)",
-                            RegexOptions.IgnoreCase | RegexOptions.Multiline
+                            @"enc=([\d\.]+);\s*pwm=([\d\.]+)",
+                            RegexOptions.IgnoreCase
                         );
 
                         if (match.Success)
                         {
-                            temp = double.Parse(match.Groups[1].Value);
-                            humi = double.Parse(match.Groups[2].Value);
-                            adc = int.Parse(match.Groups[3].Value);
-
-                            // Vẽ chart
-                            chart1.Series[0].Points.AddY(temp);
-                            chart1.Series[1].Points.AddY(humi);
-                            chart2.Series[0].Points.AddY(adc);
-
-                            // Giới hạn số điểm hiển thị (tránh chart quá dày)
-                            if (chart1.Series[0].Points.Count > 100)
+                            // 2. Lấy giá trị Speed (tương ứng với enc trong chuỗi gửi)
+                            if (double.TryParse(match.Groups[1].Value, out double currentSpeed))
                             {
-                                chart1.Series[0].Points.RemoveAt(0);
-                                chart1.Series[1].Points.RemoveAt(0);
+                                velocity = currentSpeed; // Cập nhật biến velocity toàn cục
+
+                                // 3. Cập nhật lên Chart
+                                chart2.Series["Velocity"].Points.AddY(velocity);
+
+                                // Chuyển setpoint từ string sang double để vẽ
+                                if (double.TryParse(setpoint, out double spValue))
+                                {
+                                    chart2.Series["Setpoint"].Points.AddY(spValue);
+                                }
+
+                                // 4. Giới hạn số lượng điểm hiển thị (tránh lag)
+                                if (chart2.Series[0].Points.Count > 100)
+                                {
+                                    chart2.Series["Velocity"].Points.RemoveAt(0);
+                                    chart2.Series["Setpoint"].Points.RemoveAt(0);
+                                }
+                                if (completeLine.Contains("TUNING"))
+                                {
+                                    wasTuning = true;
+                                    isTrackingStep = false; // Tạm dừng tính toán thông số
+                                    lblOvershoot.Text = "Đang đo đặc tính...";
+                                    lblSettlingTime.Text = "Hệ thống đang dao động...";
+                                }
+                                else if (completeLine.Contains("PID RUN") && wasTuning == true)
+                                {
+                                    // Khoảnh khắc vàng: Vừa Tune xong và bắt đầu chạy PID!
+                                    wasTuning = false;       // Reset cờ
+                                    isTrackingStep = true;   // BẮT ĐẦU TÍNH TOÁN!
+                                    stepPointsCount = 0;
+                                    startVelocity = velocity;
+                                    maxVelocityReached = velocity;
+                                    minVelocityReached = velocity;            
+                                    currentSetpoint = double.Parse(setpoint); // Lấy Setpoint hiện tại
+
+                                    lblOvershoot.Text = "Đang tính vọt lố...";
+                                }
+
+                                if (isTrackingStep)
+                                {
+                                    stepPointsCount++;
+
+                                    // Liên tục tìm đỉnh và đáy
+                                    if (currentSpeed > maxVelocityReached) maxVelocityReached = currentSpeed;
+                                    if (currentSpeed < minVelocityReached) minVelocityReached = currentSpeed;
+
+                                    // Tính sai số hiện tại so với Setpoint
+                                    double error = Math.Abs(currentSetpoint - currentSpeed);
+                                    double errorPercent = (error / currentSetpoint) * 100.0;
+
+                                    // 2. Cập nhật Sai số liên tục
+                                    lblError.Text = $"Sai số tĩnh: {errorPercent:F1}%";
+
+                                    // 3. Kiểm tra Thời gian đáp ứng (Settling Time)
+                                    // Nếu tốc độ đã lọt vào dải sai số +-5% và ở đó (có thể thêm logic đếm liên tiếp)
+                                    if (errorPercent <= 5.0 && stepPointsCount > 5)
+                                    {
+                                        // Tính vọt lố
+                                        double overshoot = 0;
+                                        // KIỂM TRA ĐANG TĂNG TỐC HAY GIẢM TỐC
+                                        if (currentSetpoint >= startVelocity)
+                                        {
+                                            // Tăng tốc: Tìm độ vọt lố CẠNH TRÊN
+                                            if (maxVelocityReached > currentSetpoint)
+                                                overshoot = ((maxVelocityReached - currentSetpoint) / currentSetpoint) * 100.0;
+                                        }
+                                        else
+                                        {
+                                            // Giảm tốc: Tìm độ vọt lố CẠNH DƯỚI (Undershoot)
+                                            if (minVelocityReached < currentSetpoint)
+                                                overshoot = ((currentSetpoint - minVelocityReached) / currentSetpoint) * 100.0;
+                                        }
+                                        lblOvershoot.Text = $"Vọt lố: {overshoot:F1}%";
+
+                                        // Tính thời gian (Số điểm * 0.5 giây)
+                                        double settlingTime = stepPointsCount * 0.5;
+                                        lblSettlingTime.Text = $"T/gian đáp ứng: {settlingTime:F1} s";
+
+                                        // Hoàn thành 1 lần đo
+                                        isTrackingStep = false;
+                                    }
+                                }
                             }
-                            if (chart2.Series[0].Points.Count > 100)
-                            {
-                                chart2.Series[0].Points.RemoveAt(0);
-                            }
-                        }
-                        else
-                        {
-                           
                         }
                     }
                 }));
@@ -250,15 +234,8 @@ namespace UartWinFormsExample
 
         private void AppendReceived(byte[] data)
         {
-            if (radioHexDisplay.Checked)
-            {
-                txtReceived.AppendText(BitConverter.ToString(data).Replace("-", " ") + Environment.NewLine);
-            }
-            else
-            {
                 string s = _serial.Encoding.GetString(data);
                 txtReceived.AppendText(s);
-            }
         }
 
         private void btnRefresh_Click(object sender, EventArgs e) => LoadComPorts();
@@ -288,59 +265,29 @@ namespace UartWinFormsExample
             lbl_DateAndTime.Text = "Date: " + DateTime.Now.ToString("yyyy-MM-dd");
         }
 
-        private void btnMode_Click(object sender, EventArgs e)
-        {
-            if (btnMode.Text == "Tự động")
-            {
-                if (_serial.IsOpen)
-                {
-                    _serial.Write("m");
-                    btnMode.Text = "Thủ công";
-                }
-                else
-                {
-                    MessageBox.Show("Chưa kết nối cổng COM");
-                }
-            }
-            else
-            {
-                if (_serial.IsOpen)
-                {
-                    _serial.Write("a");
-                    btnMode.Text = "Tự động";
-                }
-                else
-                {
-                    MessageBox.Show("Chưa kết nối cổng COM");
-                }
-            }
-               
-        }
-
-        private void txtSend_TextChanged(object sender, EventArgs e)
-        {
-
-        }
 
         private void btnSet_Click(object sender, EventArgs e)
         {
             if (!_serial.IsOpen) { MessageBox.Show("COM chưa mở"); return; }
             try
             {
-                string s = txtSet.Text;
-                if (checkBoxAppendNewline.Checked) s += "\r\n";
-                if (radioHex.Checked)
-                {
-                    // gửi hex (ví dụ: "0A 01 FF")
-                    byte[] data = HexStringToBytes(s);
-                    _serial.Write(data, 0, data.Length);
-                }
-                else
-                {
-                    _serial.Write(s);
-                }
+                setpoint = txtSet.Text;
+                _serial.Write(setpoint + "\n");
+                currentSetpoint = double.Parse(txtSet.Text);
+                isTrackingStep = true;                
+                stepPointsCount = 0;
+                startVelocity = velocity; // CHỐT TỐC ĐỘ BAN ĐẦU
+                maxVelocityReached = velocity;
+                minVelocityReached = velocity;
+                lblOvershoot.Text = "Overshoot: Tính toán...";
+                lblSettlingTime.Text = "Thời gian: Tính toán...";
             }
             catch (Exception ex) { MessageBox.Show("Gửi lỗi: " + ex.Message); }
+        }
+
+        private void btn_Tune_Click(object sender, EventArgs e)
+        {
+            _serial.Write("t");
         }
     }
 }

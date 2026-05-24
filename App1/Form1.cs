@@ -22,9 +22,12 @@ namespace UartWinFormsExample
         private bool wasTuning = false;
         private double startVelocity = 0; // Lưu tốc độ lúc vừa ấn Set
         private double minVelocityReached = 9999; // Dùng cho giảm tốc
+        double overshoot = 0;
+        private int stablePointsCount = 0; // Đếm số điểm "nằm ngoan" liên tiếp
 
         private double velocity = 0;
         private string setpoint = "80";
+        private double currentSpeed = 0;
         public Form1()
         {
             InitializeComponent();
@@ -44,7 +47,7 @@ namespace UartWinFormsExample
             chart2.Series[1].ChartType = SeriesChartType.Line;
 
             // Cố định trục Y cho chart2 (ADC)
-            chart2.ChartAreas[0].AxisY.Minimum = 0;
+            chart2.ChartAreas[0].AxisY.Minimum = double.NaN;
             chart2.ChartAreas[0].AxisY.Maximum = 200;  // Với ADC 12-bit
         }
        
@@ -129,14 +132,14 @@ namespace UartWinFormsExample
                         // Parse dữ liệu
                         var match = Regex.Match(
                             completeLine,
-                            @"enc=([\d\.]+);\s*pwm=([\d\.]+)",
+                            @"enc=([\d\.]+);\s*pwm=([-\d\.]+)",
                             RegexOptions.IgnoreCase
                         );
 
                         if (match.Success)
                         {
                             // 2. Lấy giá trị Speed (tương ứng với enc trong chuỗi gửi)
-                            if (double.TryParse(match.Groups[1].Value, out double currentSpeed))
+                            if (double.TryParse(match.Groups[1].Value, out currentSpeed))
                             {
                                 velocity = currentSpeed; // Cập nhật biến velocity toàn cục
 
@@ -154,72 +157,84 @@ namespace UartWinFormsExample
                                 {
                                     chart2.Series["Velocity"].Points.RemoveAt(0);
                                     chart2.Series["Setpoint"].Points.RemoveAt(0);
-                                }
-                                if (completeLine.Contains("TUNING"))
-                                {
-                                    wasTuning = true;
-                                    isTrackingStep = false; // Tạm dừng tính toán thông số
-                                    lblOvershoot.Text = "Đang đo đặc tính...";
-                                    lblSettlingTime.Text = "Hệ thống đang dao động...";
-                                }
-                                else if (completeLine.Contains("PID RUN") && wasTuning == true)
-                                {
-                                    // Khoảnh khắc vàng: Vừa Tune xong và bắt đầu chạy PID!
-                                    wasTuning = false;       // Reset cờ
-                                    isTrackingStep = true;   // BẮT ĐẦU TÍNH TOÁN!
-                                    stepPointsCount = 0;
-                                    startVelocity = velocity;
-                                    maxVelocityReached = velocity;
-                                    minVelocityReached = velocity;            
-                                    currentSetpoint = double.Parse(setpoint); // Lấy Setpoint hiện tại
+                                }                                
+                            }
+                        }
+                        if (completeLine.Contains("TUNING"))
+                        {
+                            wasTuning = true;
+                            isTrackingStep = false; // Tạm dừng tính toán thông số
+                            lblOvershoot.Text = "Đang đo đặc tính...";
+                            lblSettlingTime.Text = "Hệ thống đang dao động...";
+                        }
+                        else if (completeLine.Contains("PID RUN") && wasTuning == true)
+                        {
+                            // Khoảnh khắc vàng: Vừa Tune xong và bắt đầu chạy PID!
+                            stablePointsCount = 0;
+                            wasTuning = false;       // Reset cờ
+                            isTrackingStep = true;   // BẮT ĐẦU TÍNH TOÁN!
+                            stepPointsCount = 0;
+                            startVelocity = velocity;
+                            maxVelocityReached = velocity;
+                            minVelocityReached = velocity;
+                            currentSetpoint = double.Parse(setpoint); // Lấy Setpoint hiện tại
 
-                                    lblOvershoot.Text = "Đang tính vọt lố...";
-                                }
+                            lblOvershoot.Text = "Đang tính vọt lố...";
+                        }
 
-                                if (isTrackingStep)
-                                {
-                                    stepPointsCount++;
+                        if (isTrackingStep)
+                        {
+                            stepPointsCount++;
 
-                                    // Liên tục tìm đỉnh và đáy
-                                    if (currentSpeed > maxVelocityReached) maxVelocityReached = currentSpeed;
-                                    if (currentSpeed < minVelocityReached) minVelocityReached = currentSpeed;
 
-                                    // Tính sai số hiện tại so với Setpoint
-                                    double error = Math.Abs(currentSetpoint - currentSpeed);
-                                    double errorPercent = (error / currentSetpoint) * 100.0;
+                            // Liên tục tìm đỉnh và đáy
+                            if (currentSpeed > maxVelocityReached) maxVelocityReached = currentSpeed;
+                            if (currentSpeed < minVelocityReached) minVelocityReached = currentSpeed;
 
-                                    // 2. Cập nhật Sai số liên tục
-                                    lblError.Text = $"Sai số tĩnh: {errorPercent:F1}%";
+                            // Tính sai số hiện tại so với Setpoint
+                            double error = Math.Abs(currentSetpoint - currentSpeed);
+                            double errorPercent = (error / currentSetpoint) * 100.0;
 
-                                    // 3. Kiểm tra Thời gian đáp ứng (Settling Time)
-                                    // Nếu tốc độ đã lọt vào dải sai số +-5% và ở đó (có thể thêm logic đếm liên tiếp)
-                                    if (errorPercent <= 5.0 && stepPointsCount > 5)
-                                    {
-                                        // Tính vọt lố
-                                        double overshoot = 0;
-                                        // KIỂM TRA ĐANG TĂNG TỐC HAY GIẢM TỐC
-                                        if (currentSetpoint >= startVelocity)
-                                        {
-                                            // Tăng tốc: Tìm độ vọt lố CẠNH TRÊN
-                                            if (maxVelocityReached > currentSetpoint)
-                                                overshoot = ((maxVelocityReached - currentSetpoint) / currentSetpoint) * 100.0;
-                                        }
-                                        else
-                                        {
-                                            // Giảm tốc: Tìm độ vọt lố CẠNH DƯỚI (Undershoot)
-                                            if (minVelocityReached < currentSetpoint)
-                                                overshoot = ((currentSetpoint - minVelocityReached) / currentSetpoint) * 100.0;
-                                        }
-                                        lblOvershoot.Text = $"Vọt lố: {overshoot:F1}%";
+                            // 2. Cập nhật Sai số liên tục
+                            lblError.Text = $"Sai số tĩnh: {errorPercent:F1}%";
 
-                                        // Tính thời gian (Số điểm * 0.5 giây)
-                                        double settlingTime = stepPointsCount * 0.5;
-                                        lblSettlingTime.Text = $"T/gian đáp ứng: {settlingTime:F1} s";
+                            // KIỂM TRA ĐANG TĂNG TỐC HAY GIẢM TỐC
+                            if (currentSetpoint >= startVelocity)
+                            {
+                                // Tăng tốc: Tìm độ vọt lố CẠNH TRÊN
+                                if (maxVelocityReached > currentSetpoint)
+                                    overshoot = ((maxVelocityReached - currentSetpoint) / currentSetpoint) * 100.0;
+                            }
+                            else
+                            {
+                                // Giảm tốc: Tìm độ vọt lố CẠNH DƯỚI (Undershoot)
+                                if (minVelocityReached < currentSetpoint)
+                                    overshoot = ((currentSetpoint - minVelocityReached) / currentSetpoint) * 100.0;
+                            }
+                            lblOvershoot.Text = $"Vọt lố: {overshoot:F1}%";
 
-                                        // Hoàn thành 1 lần đo
-                                        isTrackingStep = false;
-                                    }
-                                }
+                            // 2. LOGIC KIỂM TRA ĐỘ ỔN ĐỊNH THỰC SỰ
+                            if (errorPercent <= 5.0)
+                            {
+                                stablePointsCount++; // Ngoan ngoãn ở trong dải 5% -> Cộng dồn điểm
+                            }
+                            else
+                            {
+                                stablePointsCount = 0; // BỊ VĂNG RA NGOÀI -> Hủy bỏ, đếm lại sự ổn định từ đầu!
+                            }
+
+                            // 3. Kiểm tra Thời gian đáp ứng (Settling Time)
+                            // Nếu tốc độ đã lọt vào dải sai số +-5% và ở đó (có thể thêm logic đếm liên tiếp)
+                            if (stablePointsCount >= 15)
+                            {
+
+
+
+                                double settlingTime = (stepPointsCount - stablePointsCount) * 0.5;
+                                lblSettlingTime.Text = $"T/gian đáp ứng: {settlingTime:F1} s";
+
+                                // Hoàn thành 1 lần đo
+                                isTrackingStep = false;
                             }
                         }
                     }
@@ -274,7 +289,8 @@ namespace UartWinFormsExample
                 setpoint = txtSet.Text;
                 _serial.Write(setpoint + "\n");
                 currentSetpoint = double.Parse(txtSet.Text);
-                isTrackingStep = true;                
+                isTrackingStep = true;
+                stablePointsCount = 0;
                 stepPointsCount = 0;
                 startVelocity = velocity; // CHỐT TỐC ĐỘ BAN ĐẦU
                 maxVelocityReached = velocity;
@@ -287,6 +303,7 @@ namespace UartWinFormsExample
 
         private void btn_Tune_Click(object sender, EventArgs e)
         {
+            if (!_serial.IsOpen) { MessageBox.Show("COM chưa mở"); return; }
             _serial.Write("t");
         }
     }
